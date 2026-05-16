@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -54,6 +50,10 @@ export class SyncService {
     // Step 4: Fetch all Salla products
     const sallaProducts = await this.sallaService.fetchAllProducts(accessToken);
 
+    console.log({
+      sallaProducts,
+    });
+
     // Step 5: Build update list
     const updateList: Array<{ productId: string; quantity: number }> = [];
     let notFound = 0;
@@ -78,7 +78,8 @@ export class SyncService {
     const matched = aggregated.size - notFound;
 
     // Step 6: Update products with concurrency control
-    const concurrency = this.config.get<number>('SALLA_UPDATE_CONCURRENCY') ?? 5;
+    const concurrency =
+      this.config.get<number>('SALLA_UPDATE_CONCURRENCY') ?? 5;
     const retryCount = this.config.get<number>('SALLA_RETRY_COUNT') ?? 3;
     const retryDelayMs = this.config.get<number>('SALLA_RETRY_DELAY_MS') ?? 500;
 
@@ -105,7 +106,9 @@ export class SyncService {
           updated++;
         } else {
           failed++;
-          this.logger.error(`Failed to update product: ${String(result.reason)}`);
+          this.logger.error(
+            `Failed to update product: ${String(result.reason)}`,
+          );
         }
       }
     }
@@ -151,7 +154,7 @@ export class SyncService {
   ): Promise<SyncLog[]> {
     if (requestingClientId !== targetClientId) {
       throw new ForbiddenException(
-        'You are not authorized to view this client\'s sync history',
+        "You are not authorized to view this client's sync history",
       );
     }
 
