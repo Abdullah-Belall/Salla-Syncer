@@ -59,7 +59,11 @@ export class SallaService {
         const { data, pagination } = response.data;
 
         for (const product of data) {
-          const barcode = product.sku?.trim();
+          console.log({
+            product,
+          });
+
+          const barcode = (product as any).barcode?.trim();
           if (barcode) {
             productMap.set(barcode, {
               productId: String(product.id),
