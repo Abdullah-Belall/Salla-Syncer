@@ -12,15 +12,12 @@ import { SallaService } from '../salla/salla.service';
 import { SyncInventoryDto } from './dto/sync-inventory.dto';
 
 export interface SyncResult {
-  status: 'success' | 'partial' | 'failed';
-  totalItems: number;
-  matchedProducts: number;
-  updatedProducts: number;
-  skippedNoChange: number;
-  skippedNotFound: number;
-  failedUpdates: number;
-  startedAt: string;
-  finishedAt: string;
+  totalSent: number;
+  matched: number;
+  updated: number;
+  skipped: number;
+  notFound: number;
+  failed: number;
 }
 
 @Injectable()
@@ -52,41 +49,41 @@ export class SyncService {
       aggregated.set(barcode, Math.max(0, Math.floor(current + item.quantity)));
     }
 
-    const totalItems = aggregated.size;
+    const totalSent = dto.items.length;
 
     // Step 4: Fetch all Salla products
     const sallaProducts = await this.sallaService.fetchAllProducts(accessToken);
 
     // Step 5: Build update list
     const updateList: Array<{ productId: string; quantity: number }> = [];
-    let skippedNotFound = 0;
-    let skippedNoChange = 0;
+    let notFound = 0;
+    let skipped = 0;
 
     for (const [barcode, quantity] of aggregated.entries()) {
       const product = sallaProducts.get(barcode);
 
       if (!product) {
-        skippedNotFound++;
+        notFound++;
         continue;
       }
 
       if (product.currentQuantity === quantity) {
-        skippedNoChange++;
+        skipped++;
         continue;
       }
 
       updateList.push({ productId: product.productId, quantity });
     }
 
-    const matchedProducts = totalItems - skippedNotFound;
+    const matched = aggregated.size - notFound;
 
     // Step 6: Update products with concurrency control
     const concurrency = this.config.get<number>('SALLA_UPDATE_CONCURRENCY') ?? 5;
     const retryCount = this.config.get<number>('SALLA_RETRY_COUNT') ?? 3;
     const retryDelayMs = this.config.get<number>('SALLA_RETRY_DELAY_MS') ?? 500;
 
-    let updatedProducts = 0;
-    let failedUpdates = 0;
+    let updated = 0;
+    let failed = 0;
 
     for (let i = 0; i < updateList.length; i += concurrency) {
       const chunk = updateList.slice(i, i + concurrency);
@@ -105,19 +102,19 @@ export class SyncService {
 
       for (const result of results) {
         if (result.status === 'fulfilled') {
-          updatedProducts++;
+          updated++;
         } else {
-          failedUpdates++;
+          failed++;
           this.logger.error(`Failed to update product: ${String(result.reason)}`);
         }
       }
     }
 
-    // Step 7: Determine overall status
+    // Step 7: Determine overall status for the log
     let status: 'success' | 'partial' | 'failed';
-    if (failedUpdates === 0) {
+    if (failed === 0) {
       status = 'success';
-    } else if (updatedProducts > 0) {
+    } else if (updated > 0) {
       status = 'partial';
     } else {
       status = 'failed';
@@ -129,33 +126,23 @@ export class SyncService {
     const log = this.syncLogRepository.create({
       clientId,
       status,
-      totalItems,
-      matchedProducts,
-      updatedProducts,
-      skippedNoChange,
-      skippedNotFound,
-      failedUpdates,
+      totalItems: totalSent,
+      matchedProducts: matched,
+      updatedProducts: updated,
+      skippedNoChange: skipped,
+      skippedNotFound: notFound,
+      failedUpdates: failed,
       startedAt,
       finishedAt,
     });
     await this.syncLogRepository.save(log);
 
     this.logger.log(
-      `Sync complete for client ${clientId}: status=${status}, updated=${updatedProducts}, failed=${failedUpdates}`,
+      `Sync complete for client ${clientId}: status=${status}, updated=${updated}, failed=${failed}`,
     );
 
-    // Step 9: Return result
-    return {
-      status,
-      totalItems,
-      matchedProducts,
-      updatedProducts,
-      skippedNoChange,
-      skippedNotFound,
-      failedUpdates,
-      startedAt: startedAt.toISOString(),
-      finishedAt: finishedAt.toISOString(),
-    };
+    // Step 9: Return contract-compliant response
+    return { totalSent, matched, updated, skipped, notFound, failed };
   }
 
   async getSyncHistory(
