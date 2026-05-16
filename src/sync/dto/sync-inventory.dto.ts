@@ -19,6 +19,10 @@ export class InventoryItemDto {
 }
 
 export class SyncInventoryDto {
+  @IsString()
+  @IsNotEmpty()
+  warehouseCode!: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => InventoryItemDto)

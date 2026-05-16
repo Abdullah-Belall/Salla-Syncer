@@ -19,6 +19,9 @@ export class SyncLog {
   @Column()
   clientId!: number;
 
+  @Column({ nullable: true })
+  warehouseCode!: string;
+
   @Column()
   status!: 'success' | 'partial' | 'failed';
 

@@ -128,6 +128,7 @@ export class SyncService {
     // Step 8: Save sync log
     const log = this.syncLogRepository.create({
       clientId,
+      warehouseCode: dto.warehouseCode,
       status,
       totalItems: totalSent,
       matchedProducts: matched,
@@ -141,7 +142,7 @@ export class SyncService {
     await this.syncLogRepository.save(log);
 
     this.logger.log(
-      `Sync complete for client ${clientId}: status=${status}, updated=${updated}, failed=${failed}`,
+      `Sync complete for client ${clientId} warehouse=${dto.warehouseCode}: status=${status}, updated=${updated}, failed=${failed}`,
     );
 
     // Step 9: Return contract-compliant response
