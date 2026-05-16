@@ -8,11 +8,12 @@ interface SallaWebhookPayload {
   event: string;
   merchant: number;
   data?: {
-    token?: {
-      access_token: string;
-      refresh_token: string;
-      expires_in: number;
-    };
+    access_token?: string;
+    refresh_token?: string;
+    /** Unix timestamp (seconds) when the access token expires */
+    expires?: number;
+    scope?: string;
+    token_type?: string;
   };
 }
 
@@ -33,11 +34,16 @@ export class WebhookService {
     }
 
     const merchantId = String(payload.merchant);
-    const tokenData = payload.data?.token;
+    const data = payload.data;
 
-    if (!tokenData) {
+    console.log(data);
+
+    if (!data?.access_token || !data?.refresh_token || !data?.expires) {
       this.logger.warn(
         `Received app.store.authorize for merchant ${merchantId} but no token data`,
+      );
+      this.logger.debug(
+        `Payload data received: ${JSON.stringify(data ?? null)}`,
       );
       return;
     }
@@ -47,17 +53,18 @@ export class WebhookService {
     });
 
     if (!client) {
-      this.logger.warn(
-        `Received webhook for unknown merchant ${merchantId}`,
-      );
+      this.logger.warn(`Received webhook for unknown merchant ${merchantId}`);
       return;
     }
 
+    // Salla sends `expires` as a Unix timestamp; convert to seconds-until-expiry
+    const expiresInSeconds = data.expires - Math.floor(Date.now() / 1000);
+
     await this.tokenService.upsertToken(
       client.id,
-      tokenData.access_token,
-      tokenData.refresh_token,
-      tokenData.expires_in,
+      data.access_token,
+      data.refresh_token,
+      expiresInSeconds,
     );
 
     this.logger.log(
