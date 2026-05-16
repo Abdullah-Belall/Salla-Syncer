@@ -12,11 +12,7 @@ import { SyncLog } from './entities/sync-log.entity';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        host: config.get<string>('DB_HOST'),
-        port: config.get<number>('DB_PORT'),
-        username: config.get<string>('DB_USERNAME'),
-        password: config.get<string>('DB_PASSWORD'),
-        database: config.get<string>('DB_NAME'),
+        url: config.get<string>('DATABASE_URL'),
         entities: [Client, SallaToken, SyncLog],
         // NOTE: Set synchronize to false in production and use TypeORM migrations instead.
         synchronize: true,
